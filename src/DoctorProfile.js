@@ -14,14 +14,17 @@ export default function DoctorProfile({ doctor, user, onClose, onBook }) {
     fetchReviews();
   }, []);
 
-  const fetchReviews = async () => {
-    const { data } = await supabase
-      .from('reviews')
-      .select('*, users(full_name)')
-      .eq('doctor_id', doctor.id)
-      .eq('is_visible', true)
-      .order('created_at', { ascending: false });
-    setReviews(data || []);
+const fetchReviews = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('reviews')
+        .select('*')
+        .eq('doctor_id', doctor.id);
+      console.log('REVIEWS:', data, 'ERROR:', error);
+      setReviews(data || []);
+    } catch (e) {
+      console.log('CATCH:', e);
+    }
     setLoading(false);
   };
 
@@ -107,7 +110,7 @@ export default function DoctorProfile({ doctor, user, onClose, onBook }) {
               <div key={review.id} style={{ padding: '14px 0', borderBottom: '1px solid #f0f4f8' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
                   <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1a2e' }}>
-                    {review.users?.full_name || 'Patient anonyme'}
+                    Patient anonyme
                   </div>
                   <div style={{ display: 'flex' }}>{stars(review.rating)}</div>
                 </div>

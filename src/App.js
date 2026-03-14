@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import './App.css';
 import DoctorProfile from './DoctorProfile';
+import ReviewModal from './ReviewModal';
 
 const SPECIALTIES = [
   'Tous', 'Cardiologue', 'Dermatologue', 'Pédiatre',
@@ -162,7 +163,7 @@ function LoginScreen({ onClose, onSwitchToRegister, onLogin }) {
   );
 }
 
-function RegisterScreen({ onClose, onSwitchToLogin, onLogin }) {
+function RegisterScreen({ onClose, onSwitchToLogin }) {
   const [form, setForm] = useState({ full_name: '', email: '', phone: '', password: '', confirm: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -175,8 +176,8 @@ function RegisterScreen({ onClose, onSwitchToLogin, onLogin }) {
     if (form.password !== form.confirm) { setError('Les mots de passe ne correspondent pas.'); return; }
     if (form.password.length < 6) { setError('Le mot de passe doit avoir au moins 6 caractères.'); return; }
     setLoading(true); setError('');
-const { error: authError } = await supabase.auth.signUp({ email: form.email, password: form.password });
-   if (authError) { setError(authError.message); setLoading(false); return; }
+    const { error: authError } = await supabase.auth.signUp({ email: form.email, password: form.password });
+    if (authError) { setError(authError.message); setLoading(false); return; }
     await supabase.from('users').insert({ full_name: form.full_name, email: form.email, phone: form.phone });
     setSuccess(true);
     setLoading(false);
@@ -234,6 +235,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [bookingDoctor, setBookingDoctor] = useState(null);
   const [profileDoctor, setProfileDoctor] = useState(null);
+  const [reviewAppointment, setReviewAppointment] = useState(null);
   const [showMyRdv, setShowMyRdv] = useState(false);
   const [myAppointments, setMyAppointments] = useState([]);
   const [rdvLoading, setRdvLoading] = useState(false);
@@ -287,18 +289,26 @@ export default function App() {
     <div style={{ fontFamily: "'Segoe UI', sans-serif", background: '#f0f6ff', minHeight: '100vh' }}>
 
       {/* MODALS */}
+      {reviewAppointment && (
+        <ReviewModal
+          appointment={reviewAppointment}
+          user={user}
+          onClose={() => setReviewAppointment(null)}
+          onReviewed={() => { fetchMyAppointments(); }}
+        />
+      )}
       {profileDoctor && (
-  <DoctorProfile
-    doctor={profileDoctor}
-    user={user}
-    onClose={() => setProfileDoctor(null)}
-    onBook={(doc) => {
-      setProfileDoctor(null);
-      if (!user) { setScreen('login'); }
-      else { setBookingDoctor(doc); }
-    }}
-  />
-)}
+        <DoctorProfile
+          doctor={profileDoctor}
+          user={user}
+          onClose={() => setProfileDoctor(null)}
+          onBook={(doc) => {
+            setProfileDoctor(null);
+            if (!user) { setScreen('login'); }
+            else { setBookingDoctor(doc); }
+          }}
+        />
+      )}
       {bookingDoctor && user && (
         <BookingModal doctor={bookingDoctor} user={user} onClose={() => setBookingDoctor(null)} onBooked={() => setTimeout(() => setBookingDoctor(null), 3000)} />
       )}
@@ -414,10 +424,21 @@ export default function App() {
                   </div>
                   <div style={{ fontWeight: 800, color: '#0057b8', fontSize: 15 }}>{appt.price ? `${appt.price} DA` : '—'}</div>
                   {appt.status === 'confirmed' && (
-                    <button onClick={async () => { await supabase.from('appointments').update({ status: 'cancelled' }).eq('id', appt.id); fetchMyAppointments(); }}
-                      style={{ display: 'block', marginTop: 8, background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '5px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
-                      Annuler
-                    </button>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap', justifyContent: isMobile ? 'flex-start' : 'flex-end' }}>
+                      <button
+                        onClick={async () => {
+                          await supabase.from('appointments').update({ status: 'cancelled' }).eq('id', appt.id);
+                          fetchMyAppointments();
+                        }}
+                        style={{ background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '5px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
+                        Annuler
+                      </button>
+                      <button
+                        onClick={() => setReviewAppointment(appt)}
+                        style={{ background: 'none', border: '1px solid #fbbf24', color: '#d97706', padding: '5px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
+                        ⭐ Avis
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -467,9 +488,9 @@ export default function App() {
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
                 {doctors.map(doc => (
                   <div key={doc.id} style={{ ...S.card, transition: 'transform 0.2s', cursor: 'pointer' }}
-  onClick={() => setProfileDoctor(doc)}
-  onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
-  onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
+                    onClick={() => setProfileDoctor(doc)}
+                    onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
+                    onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
                     <div style={{ display: 'flex', gap: 14, marginBottom: 16 }}>
                       <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #0057b8, #0096c7)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 800, fontSize: 18, flexShrink: 0 }}>
                         {doc.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2)}
@@ -483,7 +504,7 @@ export default function App() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 14, borderTop: '1px solid #f0f4f8' }}>
                       <div><span style={{ color: '#f59e0b' }}>★ </span><span style={{ fontWeight: 700, fontSize: 14 }}>{doc.rating || '—'}</span></div>
                       <span style={{ fontWeight: 800, color: '#0057b8', fontSize: 15 }}>{doc.price ? `${doc.price} DA` : '—'}</span>
-                      <button onClick={() => !user ? setScreen('login') : setBookingDoctor(doc)}
+                      <button onClick={e => { e.stopPropagation(); !user ? setScreen('login') : setBookingDoctor(doc); }}
                         style={{ background: 'linear-gradient(135deg, #0057b8, #0096c7)', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13, fontFamily: 'inherit' }}>
                         Prendre RDV
                       </button>
