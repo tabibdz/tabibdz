@@ -3,6 +3,8 @@ import { supabase } from './supabase';
 import './App.css';
 import DoctorProfile from './DoctorProfile';
 import ReviewModal from './ReviewModal';
+import DoctorRegister from './DoctorRegister';
+import DoctorDashboard from './DoctorDashboard';
 
 const SPECIALTIES = [
   'Tous', 'Cardiologue', 'Dermatologue', 'Pédiatre',
@@ -131,9 +133,14 @@ function LoginScreen({ onClose, onSwitchToRegister, onLogin }) {
     if (!email || !password) { setError('Veuillez remplir tous les champs.'); return; }
     setLoading(true); setError('');
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setError('Email ou mot de passe incorrect. Vérifiez votre boîte email pour confirmer votre compte.');
-    else { onLogin(data.user); onClose(); }
-    setLoading(false);
+    if (error) {
+      setError('Email ou mot de passe incorrect. Vérifiez votre boîte email pour confirmer votre compte.');
+      setLoading(false);
+    } else {
+      await onLogin(data.user);
+      onClose();
+      setLoading(false);
+    }
   };
 
   return (
@@ -233,28 +240,44 @@ export default function App() {
   const [searched, setSearched] = useState(false);
   const [screen, setScreen] = useState(null);
   const [user, setUser] = useState(null);
+  const [isDoctor, setIsDoctor] = useState(false);
   const [bookingDoctor, setBookingDoctor] = useState(null);
   const [profileDoctor, setProfileDoctor] = useState(null);
   const [reviewAppointment, setReviewAppointment] = useState(null);
+  const [showDoctorRegister, setShowDoctorRegister] = useState(false);
   const [showMyRdv, setShowMyRdv] = useState(false);
   const [myAppointments, setMyAppointments] = useState([]);
   const [rdvLoading, setRdvLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        const { data } = await supabase
+          .from('doctors')
+          .select('id')
+          .eq('auth_id', session.user.id)
+          .single();
+        setIsDoctor(!!data);
+      }
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    setUser(session?.user ?? null);
+    if (session?.user) {
+      supabase.from('doctors').select('id').eq('auth_id', session.user.id).single()
+        .then(({ data }) => setIsDoctor(!!data));
+    } else {
+      setIsDoctor(false);
+    }
+  });
+    return () => subscription.unsubscribe();
   }, []);
 
   const fetchMyAppointments = async () => {
@@ -285,10 +308,21 @@ export default function App() {
     setLoading(false);
   };
 
+  // Show doctor dashboard if logged in as doctor
+  if (isDoctor && user) {
+    return <DoctorDashboard user={user} onLogout={() => { supabase.auth.signOut(); setUser(null); setIsDoctor(false); }} />;
+  }
+
   return (
     <div style={{ fontFamily: "'Segoe UI', sans-serif", background: '#f0f6ff', minHeight: '100vh' }}>
 
       {/* MODALS */}
+      {showDoctorRegister && (
+        <DoctorRegister
+          onClose={() => setShowDoctorRegister(false)}
+          onSwitchToLogin={() => { setShowDoctorRegister(false); setScreen('login'); }}
+        />
+      )}
       {reviewAppointment && (
         <ReviewModal
           appointment={reviewAppointment}
@@ -327,12 +361,14 @@ export default function App() {
               <>
                 {!isMobile && <span style={{ color: 'white', fontSize: 13 }}>👋 {user.email}</span>}
                 <button onClick={fetchMyAppointments} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', fontSize: 13 }}>📋 {!isMobile && 'Mes '}RDV</button>
+                <button onClick={() => setShowDoctorRegister(true)} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', fontSize: 13 }}>🩺 {!isMobile && 'Espace '}Médecin</button>
                 <button onClick={() => { supabase.auth.signOut(); setUser(null); }} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', fontSize: 13 }}>
                   {isMobile ? '🚪' : 'Déconnexion'}
                 </button>
               </>
             ) : (
               <>
+                <button onClick={() => setShowDoctorRegister(true)} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', padding: '8px 14px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', fontSize: 13 }}>🩺 {!isMobile && 'Espace '}Médecin</button>
                 <button onClick={() => setScreen('login')} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', padding: '8px 14px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', fontSize: 13 }}>Connexion</button>
                 <button onClick={() => setScreen('register')} style={{ background: 'white', border: 'none', color: '#0057b8', padding: '8px 14px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontFamily: 'inherit', fontSize: 13 }}>S'inscrire</button>
               </>
@@ -523,8 +559,16 @@ export default function App() {
           <span style={{ fontSize: 24 }}>🩺</span>
           <span style={{ color: 'white', fontWeight: 800, fontSize: 20 }}>TabibDZ</span>
         </div>
-        <p style={{ color: '#64748b', fontSize: 13 }}>© 2026 TabibDZ — Plateforme de santé numérique — Algérie 🇩🇿</p>
+        <p style={{ color: '#64748b', fontSize: 13, marginBottom: 24 }}>© 2026 TabibDZ — Plateforme de santé numérique — Algérie 🇩🇿</p>
+        <div style={{ borderTop: '1px solid #2d3748', paddingTop: 24 }}>
+          <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 16 }}>Vous êtes médecin ou clinique?</p>
+          <button onClick={() => setShowDoctorRegister(true)}
+            style={{ background: 'linear-gradient(135deg, #0057b8, #0096c7)', color: 'white', border: 'none', padding: '12px 28px', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            🩺 Rejoindre TabibDZ en tant que médecin
+          </button>
+        </div>
       </div>
+
     </div>
   );
 }
