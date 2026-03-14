@@ -174,8 +174,8 @@ function RegisterScreen({ onClose, onSwitchToLogin, onLogin }) {
     if (form.password !== form.confirm) { setError('Les mots de passe ne correspondent pas.'); return; }
     if (form.password.length < 6) { setError('Le mot de passe doit avoir au moins 6 caractères.'); return; }
     setLoading(true); setError('');
-    const { data, error: authError } = await supabase.auth.signUp({ email: form.email, password: form.password });
-    if (authError) { setError(authError.message); setLoading(false); return; }
+const { error: authError } = await supabase.auth.signUp({ email: form.email, password: form.password });
+   if (authError) { setError(authError.message); setLoading(false); return; }
     await supabase.from('users').insert({ full_name: form.full_name, email: form.email, phone: form.phone });
     setSuccess(true);
     setLoading(false);
