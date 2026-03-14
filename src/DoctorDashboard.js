@@ -44,10 +44,10 @@ export default function DoctorDashboard({ user, onLogout }) {
       setEditForm(doctorData);
       // Get appointments
       const { data: apptData } = await supabase
-        .from('appointments')
-        .select('*, users(full_name, phone, email)')
-        .eq('doctor_id', doctorData.id)
-        .order('appointment_date', { ascending: true });
+  .from('appointments')
+  .select('*, users(full_name, phone, email)')
+  .eq('doctor_id', doctorData.id)
+  .order('appointment_date', { ascending: true });
       setAppointments(apptData || []);
     }
     setLoading(false);
@@ -180,11 +180,11 @@ export default function DoctorDashboard({ user, onLogout }) {
             <div key={appt.id} style={{ ...S.card, marginBottom: 12, display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: 12 }}>
               <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
                 <div style={{ width: 48, height: 48, borderRadius: 12, background: '#f0f6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 16, color: '#0057b8', flexShrink: 0 }}>
-                  {appt.users?.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2) || '?'}
+                  👤
                 </div>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: '#1a1a2e' }}>{appt.users?.full_name || 'Patient'}</div>
-                  <div style={{ color: '#888', fontSize: 12 }}>📞 {appt.users?.phone || '—'}</div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: '#1a1a2e' }}>Patient #{appt.user_id?.slice(0, 8)}</div>
+<div style={{ color: '#888', fontSize: 12 }}>📅 RDV #{appt.id}</div>
                   <div style={{ color: '#0057b8', fontSize: 12, marginTop: 2 }}>📅 {appt.appointment_date} · ⏰ {appt.appointment_time?.slice(0, 5)} · {appt.type}</div>
                 </div>
               </div>
