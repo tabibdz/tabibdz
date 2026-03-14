@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import './App.css';
+import DoctorProfile from './DoctorProfile';
 
 const SPECIALTIES = [
   'Tous', 'Cardiologue', 'Dermatologue', 'Pédiatre',
@@ -232,6 +233,7 @@ export default function App() {
   const [screen, setScreen] = useState(null);
   const [user, setUser] = useState(null);
   const [bookingDoctor, setBookingDoctor] = useState(null);
+  const [profileDoctor, setProfileDoctor] = useState(null);
   const [showMyRdv, setShowMyRdv] = useState(false);
   const [myAppointments, setMyAppointments] = useState([]);
   const [rdvLoading, setRdvLoading] = useState(false);
@@ -285,6 +287,18 @@ export default function App() {
     <div style={{ fontFamily: "'Segoe UI', sans-serif", background: '#f0f6ff', minHeight: '100vh' }}>
 
       {/* MODALS */}
+      {profileDoctor && (
+  <DoctorProfile
+    doctor={profileDoctor}
+    user={user}
+    onClose={() => setProfileDoctor(null)}
+    onBook={(doc) => {
+      setProfileDoctor(null);
+      if (!user) { setScreen('login'); }
+      else { setBookingDoctor(doc); }
+    }}
+  />
+)}
       {bookingDoctor && user && (
         <BookingModal doctor={bookingDoctor} user={user} onClose={() => setBookingDoctor(null)} onBooked={() => setTimeout(() => setBookingDoctor(null), 3000)} />
       )}
@@ -453,8 +467,9 @@ export default function App() {
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
                 {doctors.map(doc => (
                   <div key={doc.id} style={{ ...S.card, transition: 'transform 0.2s', cursor: 'pointer' }}
-                    onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
-                    onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
+  onClick={() => setProfileDoctor(doc)}
+  onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
+  onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
                     <div style={{ display: 'flex', gap: 14, marginBottom: 16 }}>
                       <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #0057b8, #0096c7)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 800, fontSize: 18, flexShrink: 0 }}>
                         {doc.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2)}
