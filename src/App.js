@@ -183,9 +183,14 @@ function RegisterScreen({ onClose, onSwitchToLogin }) {
     if (form.password !== form.confirm) { setError('Les mots de passe ne correspondent pas.'); return; }
     if (form.password.length < 6) { setError('Le mot de passe doit avoir au moins 6 caractères.'); return; }
     setLoading(true); setError('');
-    const { error: authError } = await supabase.auth.signUp({ email: form.email, password: form.password });
+    const { data: authData, error: authError } = await supabase.auth.signUp({ email: form.email, password: form.password });
     if (authError) { setError(authError.message); setLoading(false); return; }
-    await supabase.from('users').insert({ full_name: form.full_name, email: form.email, phone: form.phone });
+    await supabase.from('users').insert({
+      full_name: form.full_name,
+      email: form.email,
+      phone: form.phone,
+      auth_id: authData?.user?.id
+    });
     setSuccess(true);
     setLoading(false);
   };
@@ -260,23 +265,19 @@ export default function App() {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
-        const { data } = await supabase
-          .from('doctors')
-          .select('id')
-          .eq('auth_id', session.user.id)
-          .single();
+        const { data } = await supabase.from('doctors').select('id').eq('auth_id', session.user.id).single();
         setIsDoctor(!!data);
       }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-    setUser(session?.user ?? null);
-    if (session?.user) {
-      supabase.from('doctors').select('id').eq('auth_id', session.user.id).single()
-        .then(({ data }) => setIsDoctor(!!data));
-    } else {
-      setIsDoctor(false);
-    }
-  });
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        supabase.from('doctors').select('id').eq('auth_id', session.user.id).single()
+          .then(({ data }) => setIsDoctor(!!data));
+      } else {
+        setIsDoctor(false);
+      }
+    });
     return () => subscription.unsubscribe();
   }, []);
 
@@ -308,45 +309,17 @@ export default function App() {
     setLoading(false);
   };
 
-  // Show doctor dashboard if logged in as doctor
   if (isDoctor && user) {
     return <DoctorDashboard user={user} onLogout={() => { supabase.auth.signOut(); setUser(null); setIsDoctor(false); }} />;
   }
 
   return (
     <div style={{ fontFamily: "'Segoe UI', sans-serif", background: '#f0f6ff', minHeight: '100vh' }}>
-
-      {/* MODALS */}
-      {showDoctorRegister && (
-        <DoctorRegister
-          onClose={() => setShowDoctorRegister(false)}
-          onSwitchToLogin={() => { setShowDoctorRegister(false); setScreen('login'); }}
-        />
-      )}
-      {reviewAppointment && (
-        <ReviewModal
-          appointment={reviewAppointment}
-          user={user}
-          onClose={() => setReviewAppointment(null)}
-          onReviewed={() => { fetchMyAppointments(); }}
-        />
-      )}
-      {profileDoctor && (
-        <DoctorProfile
-          doctor={profileDoctor}
-          user={user}
-          onClose={() => setProfileDoctor(null)}
-          onBook={(doc) => {
-            setProfileDoctor(null);
-            if (!user) { setScreen('login'); }
-            else { setBookingDoctor(doc); }
-          }}
-        />
-      )}
-      {bookingDoctor && user && (
-        <BookingModal doctor={bookingDoctor} user={user} onClose={() => setBookingDoctor(null)} onBooked={() => setTimeout(() => setBookingDoctor(null), 3000)} />
-      )}
-      {screen === 'login' && <LoginScreen onClose={() => setScreen(null)} onSwitchToRegister={() => setScreen('register')} onLogin={u => setUser(u)} />}
+      {showDoctorRegister && <DoctorRegister onClose={() => setShowDoctorRegister(false)} onSwitchToLogin={() => { setShowDoctorRegister(false); setScreen('login'); }} />}
+      {reviewAppointment && <ReviewModal appointment={reviewAppointment} user={user} onClose={() => setReviewAppointment(null)} onReviewed={() => { fetchMyAppointments(); }} />}
+      {profileDoctor && <DoctorProfile doctor={profileDoctor} user={user} onClose={() => setProfileDoctor(null)} onBook={(doc) => { setProfileDoctor(null); if (!user) { setScreen('login'); } else { setBookingDoctor(doc); } }} />}
+      {bookingDoctor && user && <BookingModal doctor={bookingDoctor} user={user} onClose={() => setBookingDoctor(null)} onBooked={() => setTimeout(() => setBookingDoctor(null), 3000)} />}
+      {screen === 'login' && <LoginScreen onClose={() => setScreen(null)} onSwitchToRegister={() => setScreen('register')} onLogin={async (u) => { setUser(u); const { data } = await supabase.from('doctors').select('id').eq('auth_id', u.id).single(); setIsDoctor(!!data); }} />}
       {screen === 'register' && <RegisterScreen onClose={() => setScreen(null)} onSwitchToLogin={() => setScreen('login')} onLogin={u => setUser(u)} />}
 
       {/* HEADER */}
@@ -362,9 +335,7 @@ export default function App() {
                 {!isMobile && <span style={{ color: 'white', fontSize: 13 }}>👋 {user.email}</span>}
                 <button onClick={fetchMyAppointments} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', fontSize: 13 }}>📋 {!isMobile && 'Mes '}RDV</button>
                 <button onClick={() => setShowDoctorRegister(true)} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', fontSize: 13 }}>🩺 {!isMobile && 'Espace '}Médecin</button>
-                <button onClick={() => { supabase.auth.signOut(); setUser(null); }} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', fontSize: 13 }}>
-                  {isMobile ? '🚪' : 'Déconnexion'}
-                </button>
+                <button onClick={() => { supabase.auth.signOut(); setUser(null); }} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', fontSize: 13 }}>{isMobile ? '🚪' : 'Déconnexion'}</button>
               </>
             ) : (
               <>
@@ -380,31 +351,20 @@ export default function App() {
       {/* HERO */}
       <div style={{ background: 'linear-gradient(135deg, #0057b8, #0096c7)', padding: isMobile ? '40px 16px 60px' : '60px 24px 80px' }}>
         <div style={{ maxWidth: 700, margin: '0 auto', textAlign: 'center' }}>
-          <h1 style={{ color: 'white', fontSize: isMobile ? 28 : 42, fontWeight: 900, marginBottom: 16, lineHeight: 1.2 }}>
-            Votre santé, simplifiée 🇩🇿
-          </h1>
-          <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: isMobile ? 14 : 18, marginBottom: 40 }}>
-            Trouvez un médecin et prenez rendez-vous en ligne — partout en Algérie
-          </p>
+          <h1 style={{ color: 'white', fontSize: isMobile ? 28 : 42, fontWeight: 900, marginBottom: 16, lineHeight: 1.2 }}>Votre santé, simplifiée 🇩🇿</h1>
+          <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: isMobile ? 14 : 18, marginBottom: 40 }}>Trouvez un médecin et prenez rendez-vous en ligne — partout en Algérie</p>
           <div style={{ background: 'white', borderRadius: 16, padding: isMobile ? 16 : 24, boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr auto', gap: 12 }}>
               <div>
                 <label style={S.label}>SPÉCIALITÉ</label>
-                <select value={specialty} onChange={e => setSpecialty(e.target.value)} style={S.input}>
-                  {SPECIALTIES.map(s => <option key={s}>{s}</option>)}
-                </select>
+                <select value={specialty} onChange={e => setSpecialty(e.target.value)} style={S.input}>{SPECIALTIES.map(s => <option key={s}>{s}</option>)}</select>
               </div>
               <div>
                 <label style={S.label}>WILAYA</label>
-                <select value={wilaya} onChange={e => setWilaya(e.target.value)} style={S.input}>
-                  {WILAYAS.map(w => <option key={w}>{w}</option>)}
-                </select>
+                <select value={wilaya} onChange={e => setWilaya(e.target.value)} style={S.input}>{WILAYAS.map(w => <option key={w}>{w}</option>)}</select>
               </div>
               <div style={{ display: 'flex', alignItems: isMobile ? 'stretch' : 'flex-end' }}>
-                <button onClick={() => searchDoctors()}
-                  style={{ background: 'linear-gradient(135deg, #0057b8, #0096c7)', color: 'white', border: 'none', padding: '12px 28px', borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: 'pointer', width: '100%', fontFamily: 'inherit' }}>
-                  🔍 Rechercher
-                </button>
+                <button onClick={() => searchDoctors()} style={{ background: 'linear-gradient(135deg, #0057b8, #0096c7)', color: 'white', border: 'none', padding: '12px 28px', borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: 'pointer', width: '100%', fontFamily: 'inherit' }}>🔍 Rechercher</button>
               </div>
             </div>
           </div>
@@ -426,8 +386,6 @@ export default function App() {
 
       {/* CONTENT */}
       <div style={{ maxWidth: 1100, margin: '40px auto', padding: isMobile ? '0 12px 60px' : '0 24px 60px' }}>
-
-        {/* MES RDV */}
         {showMyRdv && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -461,19 +419,8 @@ export default function App() {
                   <div style={{ fontWeight: 800, color: '#0057b8', fontSize: 15 }}>{appt.price ? `${appt.price} DA` : '—'}</div>
                   {appt.status === 'confirmed' && (
                     <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap', justifyContent: isMobile ? 'flex-start' : 'flex-end' }}>
-                      <button
-                        onClick={async () => {
-                          await supabase.from('appointments').update({ status: 'cancelled' }).eq('id', appt.id);
-                          fetchMyAppointments();
-                        }}
-                        style={{ background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '5px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
-                        Annuler
-                      </button>
-                      <button
-                        onClick={() => setReviewAppointment(appt)}
-                        style={{ background: 'none', border: '1px solid #fbbf24', color: '#d97706', padding: '5px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
-                        ⭐ Avis
-                      </button>
+                      <button onClick={async () => { await supabase.from('appointments').update({ status: 'cancelled' }).eq('id', appt.id); fetchMyAppointments(); }} style={{ background: 'none', border: '1px solid #fca5a5', color: '#ef4444', padding: '5px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>Annuler</button>
+                      <button onClick={() => setReviewAppointment(appt)} style={{ background: 'none', border: '1px solid #fbbf24', color: '#d97706', padding: '5px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>⭐ Avis</button>
                     </div>
                   )}
                 </div>
@@ -482,7 +429,6 @@ export default function App() {
           </div>
         )}
 
-        {/* SPECIALTIES */}
         {!searched && !showMyRdv && (
           <>
             <h2 style={{ fontWeight: 800, fontSize: 22, color: '#1a1a2e', marginBottom: 20 }}>Spécialités populaires</h2>
@@ -500,15 +446,8 @@ export default function App() {
           </>
         )}
 
-        {/* LOADING */}
-        {loading && (
-          <div style={{ textAlign: 'center', padding: 60 }}>
-            <div style={{ fontSize: 48 }}>⏳</div>
-            <p style={{ color: '#666', marginTop: 16, fontSize: 16 }}>Recherche en cours...</p>
-          </div>
-        )}
+        {loading && <div style={{ textAlign: 'center', padding: 60 }}><div style={{ fontSize: 48 }}>⏳</div><p style={{ color: '#666', marginTop: 16, fontSize: 16 }}>Recherche en cours...</p></div>}
 
-        {/* RESULTS */}
         {searched && !loading && (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
@@ -540,10 +479,7 @@ export default function App() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 14, borderTop: '1px solid #f0f4f8' }}>
                       <div><span style={{ color: '#f59e0b' }}>★ </span><span style={{ fontWeight: 700, fontSize: 14 }}>{doc.rating || '—'}</span></div>
                       <span style={{ fontWeight: 800, color: '#0057b8', fontSize: 15 }}>{doc.price ? `${doc.price} DA` : '—'}</span>
-                      <button onClick={e => { e.stopPropagation(); !user ? setScreen('login') : setBookingDoctor(doc); }}
-                        style={{ background: 'linear-gradient(135deg, #0057b8, #0096c7)', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13, fontFamily: 'inherit' }}>
-                        Prendre RDV
-                      </button>
+                      <button onClick={e => { e.stopPropagation(); !user ? setScreen('login') : setBookingDoctor(doc); }} style={{ background: 'linear-gradient(135deg, #0057b8, #0096c7)', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13, fontFamily: 'inherit' }}>Prendre RDV</button>
                     </div>
                   </div>
                 ))}
@@ -562,13 +498,11 @@ export default function App() {
         <p style={{ color: '#64748b', fontSize: 13, marginBottom: 24 }}>© 2026 TabibDZ — Plateforme de santé numérique — Algérie 🇩🇿</p>
         <div style={{ borderTop: '1px solid #2d3748', paddingTop: 24 }}>
           <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 16 }}>Vous êtes médecin ou clinique?</p>
-          <button onClick={() => setShowDoctorRegister(true)}
-            style={{ background: 'linear-gradient(135deg, #0057b8, #0096c7)', color: 'white', border: 'none', padding: '12px 28px', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+          <button onClick={() => setShowDoctorRegister(true)} style={{ background: 'linear-gradient(135deg, #0057b8, #0096c7)', color: 'white', border: 'none', padding: '12px 28px', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
             🩺 Rejoindre TabibDZ en tant que médecin
           </button>
         </div>
       </div>
-
     </div>
   );
 }

@@ -32,7 +32,6 @@ export default function DoctorDashboard({ user, onLogout }) {
 
   const fetchDoctorData = async () => {
     setLoading(true);
-    // Get doctor profile by auth_id
     const { data: doctorData } = await supabase
       .from('doctors')
       .select('*')
@@ -40,18 +39,35 @@ export default function DoctorDashboard({ user, onLogout }) {
       .single();
 
     if (doctorData) {
-  setDoctor(doctorData);
-  setEditForm(doctorData);
-  const { data: apptData, error: apptError } = await supabase
-    .from('appointments')
-    .select('*')
-    .eq('doctor_id', doctorData.id)
-    .order('appointment_date', { ascending: true });
-  console.log('DOCTOR ID:', doctorData.id);
-  console.log('APPOINTMENTS:', apptData);
-  console.log('ERROR:', apptError);
-  setAppointments(apptData || []);
-}
+      setDoctor(doctorData);
+      setEditForm(doctorData);
+
+      // Get appointments
+      const { data: apptData } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('doctor_id', doctorData.id)
+        .order('appointment_date', { ascending: true });
+
+      // Get patient names from users table
+      if (apptData && apptData.length > 0) {
+        const apptWithUsers = await Promise.all(apptData.map(async (appt) => {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('full_name, phone')
+            .eq('auth_id', appt.user_id)
+            .single();
+          return {
+            ...appt,
+            patientName: userData?.full_name || 'Patient anonyme',
+            patientPhone: userData?.phone || '—'
+          };
+        }));
+        setAppointments(apptWithUsers);
+      } else {
+        setAppointments([]);
+      }
+    }
     setLoading(false);
   };
 
@@ -93,7 +109,7 @@ export default function DoctorDashboard({ user, onLogout }) {
       <div style={{ ...S.card, maxWidth: 400, textAlign: 'center', padding: 40 }}>
         <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
         <h2 style={{ fontWeight: 800, color: '#1a1a2e', marginBottom: 8 }}>Compte en cours de vérification</h2>
-        <p style={{ color: '#666', marginBottom: 24 }}>Votre demande est en cours d'examen par notre équipe. Vous recevrez un email sous 48h.</p>
+        <p style={{ color: '#666', marginBottom: 24 }}>Votre demande est en cours d'examen. Vous recevrez un email sous 48h.</p>
         <button onClick={onLogout} style={{ ...S.btnPrimary, width: '100%', padding: '12px' }}>Se déconnecter</button>
       </div>
     </div>
@@ -171,7 +187,7 @@ export default function DoctorDashboard({ user, onLogout }) {
           ))}
         </div>
 
-        {/* APPOINTMENTS LIST */}
+        {/* APPOINTMENTS */}
         {(activeTab === 'today' ? todayAppts : activeTab === 'upcoming' ? upcomingAppts : pastAppts).length === 0 ? (
           <div style={{ ...S.card, textAlign: 'center', padding: 48 }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>📭</div>
@@ -182,11 +198,11 @@ export default function DoctorDashboard({ user, onLogout }) {
             <div key={appt.id} style={{ ...S.card, marginBottom: 12, display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: 12 }}>
               <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
                 <div style={{ width: 48, height: 48, borderRadius: 12, background: '#f0f6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 16, color: '#0057b8', flexShrink: 0 }}>
-                  👤
+                  {appt.patientName?.split(' ').map(n => n[0]).join('').slice(0, 2) || '👤'}
                 </div>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: '#1a1a2e' }}>Patient #{appt.user_id?.slice(0, 8)}</div>
-<div style={{ color: '#888', fontSize: 12 }}>📅 RDV #{appt.id}</div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: '#1a1a2e' }}>{appt.patientName || 'Patient anonyme'}</div>
+                  <div style={{ color: '#888', fontSize: 12 }}>📞 {appt.patientPhone || '—'}</div>
                   <div style={{ color: '#0057b8', fontSize: 12, marginTop: 2 }}>📅 {appt.appointment_date} · ⏰ {appt.appointment_time?.slice(0, 5)} · {appt.type}</div>
                 </div>
               </div>
@@ -223,20 +239,16 @@ export default function DoctorDashboard({ user, onLogout }) {
             ].map(({ field, label, type }) => (
               <div key={field} style={{ marginBottom: 14 }}>
                 <label style={S.label}>{label}</label>
-                <input value={editForm[field] || ''} onChange={e => setEditForm(f => ({ ...f, [field]: e.target.value }))}
-                  type={type} style={S.input} />
+                <input value={editForm[field] || ''} onChange={e => setEditForm(f => ({ ...f, [field]: e.target.value }))} type={type} style={S.input} />
               </div>
             ))}
             <div style={{ marginBottom: 20 }}>
               <label style={S.label}>BIO</label>
-              <textarea value={editForm.bio || ''} onChange={e => setEditForm(f => ({ ...f, bio: e.target.value }))}
-                rows={3} style={{ ...S.input, resize: 'none' }} />
+              <textarea value={editForm.bio || ''} onChange={e => setEditForm(f => ({ ...f, bio: e.target.value }))} rows={3} style={{ ...S.input, resize: 'none' }} />
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => setEditMode(false)} style={{ flex: 1, background: 'none', border: '1.5px solid #e0e8f5', color: '#666', padding: '12px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>Annuler</button>
-              <button onClick={saveProfile} disabled={saving} style={{ ...S.btnPrimary, flex: 2, padding: '12px' }}>
-                {saving ? '⏳ Sauvegarde...' : '💾 Enregistrer'}
-              </button>
+              <button onClick={saveProfile} disabled={saving} style={{ ...S.btnPrimary, flex: 2, padding: '12px' }}>{saving ? '⏳ Sauvegarde...' : '💾 Enregistrer'}</button>
             </div>
           </div>
         </div>
