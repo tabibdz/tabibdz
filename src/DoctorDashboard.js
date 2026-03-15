@@ -40,16 +40,18 @@ export default function DoctorDashboard({ user, onLogout }) {
       .single();
 
     if (doctorData) {
-      setDoctor(doctorData);
-      setEditForm(doctorData);
-      // Get appointments
-      const { data: apptData } = await supabase
-  .from('appointments')
-  .select('*, users(full_name, phone, email)')
-  .eq('doctor_id', doctorData.id)
-  .order('appointment_date', { ascending: true });
-      setAppointments(apptData || []);
-    }
+  setDoctor(doctorData);
+  setEditForm(doctorData);
+  const { data: apptData, error: apptError } = await supabase
+    .from('appointments')
+    .select('*')
+    .eq('doctor_id', doctorData.id)
+    .order('appointment_date', { ascending: true });
+  console.log('DOCTOR ID:', doctorData.id);
+  console.log('APPOINTMENTS:', apptData);
+  console.log('ERROR:', apptError);
+  setAppointments(apptData || []);
+}
     setLoading(false);
   };
 
