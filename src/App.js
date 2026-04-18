@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { supabase } from './supabase';
 import './App.css';
-import DoctorProfile from './DoctorProfile';
 import ReviewModal from './ReviewModal';
 import DoctorRegister from './DoctorRegister';
 import DoctorDashboard from './DoctorDashboard';
+import DoctorProfilePage from './pages/DoctorProfilePage';
 
 const SPECIALTIES = [
   'Tous', 'Cardiologue', 'Dermatologue', 'Pédiatre',
@@ -247,13 +248,13 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [isDoctor, setIsDoctor] = useState(false);
   const [bookingDoctor, setBookingDoctor] = useState(null);
-  const [profileDoctor, setProfileDoctor] = useState(null);
   const [reviewAppointment, setReviewAppointment] = useState(null);
   const [showDoctorRegister, setShowDoctorRegister] = useState(false);
   const [showMyRdv, setShowMyRdv] = useState(false);
   const [myAppointments, setMyAppointments] = useState([]);
   const [rdvLoading, setRdvLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -314,10 +315,12 @@ export default function App() {
   }
 
   return (
-    <div style={{ fontFamily: "'Segoe UI', sans-serif", background: '#f0f6ff', minHeight: '100vh' }}>
+    <Routes>
+      <Route path="/medecin/:id" element={<DoctorProfilePage user={user} />} />
+      <Route path="/" element={
+      <div style={{ fontFamily: "'Segoe UI', sans-serif", background: '#f0f6ff', minHeight: '100vh' }}>
       {showDoctorRegister && <DoctorRegister onClose={() => setShowDoctorRegister(false)} onSwitchToLogin={() => { setShowDoctorRegister(false); setScreen('login'); }} />}
       {reviewAppointment && <ReviewModal appointment={reviewAppointment} user={user} onClose={() => setReviewAppointment(null)} onReviewed={() => { fetchMyAppointments(); }} />}
-      {profileDoctor && <DoctorProfile doctor={profileDoctor} user={user} onClose={() => setProfileDoctor(null)} onBook={(doc) => { setProfileDoctor(null); if (!user) { setScreen('login'); } else { setBookingDoctor(doc); } }} />}
       {bookingDoctor && user && <BookingModal doctor={bookingDoctor} user={user} onClose={() => setBookingDoctor(null)} onBooked={() => setTimeout(() => setBookingDoctor(null), 3000)} />}
       {screen === 'login' && <LoginScreen onClose={() => setScreen(null)} onSwitchToRegister={() => setScreen('register')} onLogin={async (u) => { setUser(u); const { data } = await supabase.from('doctors').select('id').eq('auth_id', u.id).single(); setIsDoctor(!!data); }} />}
       {screen === 'register' && <RegisterScreen onClose={() => setScreen(null)} onSwitchToLogin={() => setScreen('login')} onLogin={u => setUser(u)} />}
@@ -463,7 +466,7 @@ export default function App() {
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
                 {doctors.map(doc => (
                   <div key={doc.id} style={{ ...S.card, transition: 'transform 0.2s', cursor: 'pointer' }}
-                    onClick={() => setProfileDoctor(doc)}
+                    onClick={() => navigate(`/medecin/${doc.id}`)}
                     onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                     onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
                     <div style={{ display: 'flex', gap: 14, marginBottom: 16 }}>
@@ -504,5 +507,7 @@ export default function App() {
         </div>
       </div>
     </div>
+      } />
+    </Routes>
   );
 }
