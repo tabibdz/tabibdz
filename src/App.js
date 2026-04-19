@@ -17,24 +17,41 @@ export default function App() {
   const [isDoctor, setIsDoctor] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        const { data } = await supabase.from('doctors').select('id').eq('auth_id', session.user.id).maybeSingle();
-        setIsDoctor(!!data);
+useEffect(() => {
+    let currentUserId = null;
+
+    const checkIfDoctor = async (userId) => {
+      const { data } = await supabase
+        .from('doctors')
+        .select('id')
+        .eq('auth_id', userId)
+        .maybeSingle();
+      setIsDoctor(!!data);
+    };
+
+    // onAuthStateChange fires INITIAL_SESSION immediately on mount with the
+    // existing session, so we don't need a separate getSession() call.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      const newUserId = session?.user?.id ?? null;
+
+      // Only update state if the user actually changed.
+      // Ignore TOKEN_REFRESHED events — they fire on every background token refresh
+      // and re-running the doctor check causes race conditions with other queries.
+      if (newUserId !== currentUserId) {
+        currentUserId = newUserId;
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          checkIfDoctor(session.user.id);
+        } else {
+          setIsDoctor(false);
+        }
       }
-      setAuthLoading(false);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        const { data } = await supabase.from('doctors').select('id').eq('auth_id', session.user.id).maybeSingle();
-        setIsDoctor(!!data);
-      } else {
-        setIsDoctor(false);
+
+      if (event === 'INITIAL_SESSION') {
+        setAuthLoading(false);
       }
     });
+
     return () => subscription.unsubscribe();
   }, []);
 

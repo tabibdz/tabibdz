@@ -51,14 +51,6 @@ export default function DoctorProfilePage({ user }) {
 
   return (
     <>
-      {bookingDoctor && user && (
-        <BookingModal
-          doctor={bookingDoctor}
-          user={user}
-          onClose={() => setBookingDoctor(null)}
-          onBooked={() => setTimeout(() => setBookingDoctor(null), 3000)}
-        />
-      )}
       <DoctorProfile
         doctor={doctor}
         user={user}
@@ -68,6 +60,14 @@ export default function DoctorProfilePage({ user }) {
           else setBookingDoctor(doc);
         }}
       />
+      {bookingDoctor && user && (
+        <BookingModal
+          doctor={bookingDoctor}
+          user={user}
+          onClose={() => setBookingDoctor(null)}
+          onBooked={() => setTimeout(() => setBookingDoctor(null), 3000)}
+        />
+      )}
     </>
   );
 }
