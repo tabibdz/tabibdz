@@ -41,9 +41,12 @@ export default function LoginPage() {
           <label style={S.label}>EMAIL</label>
           <input value={email} onChange={e => setEmail(e.target.value)} placeholder="votre@email.com" type="email" style={S.input} />
         </div>
-        <div style={{ marginBottom: 20 }}>
+        <div style={{ marginBottom: 8 }}>
           <label style={S.label}>MOT DE PASSE</label>
           <input value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" type="password" style={S.input} onKeyDown={e => e.key === 'Enter' && handleLogin()} />
+        </div>
+        <div style={{ textAlign: 'right', marginBottom: 20 }}>
+          <span onClick={() => navigate('/mot-de-passe-oublie')} style={{ color: '#0057b8', fontSize: 13, cursor: 'pointer' }}>Mot de passe oublié?</span>
         </div>
         <button onClick={handleLogin} style={S.btnPrimary} disabled={loading}>{loading ? '⏳ Connexion...' : '🔐 Se connecter'}</button>
         <div style={{ textAlign: 'center', marginTop: 20, fontSize: 14, color: '#888' }}>

@@ -11,6 +11,8 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DoctorRegisterPage from './pages/DoctorRegisterPage';
 import DoctorDashboardPage from './pages/DoctorDashboardPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -77,6 +79,8 @@ useEffect(() => {
       <Route path="/pro/dashboard" element={
         <DoctorDashboardPage user={user} isDoctor={isDoctor} setUser={setUser} setIsDoctor={setIsDoctor} />
       } />
+      <Route path="/mot-de-passe-oublie" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
     </Routes>
   );
 }
